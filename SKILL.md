@@ -5,7 +5,7 @@ description: "Work with @shadow-js/virtual. Headless list and grid virtualizatio
 
 # @shadow-js/virtual
 
-Version 1.0.0. Headless list and grid virtualization that renders only the rows in view.
+Version 1.0.1. Headless list and grid virtualization that renders only the rows in view.
 
 ## Where to read more
 
@@ -23,8 +23,8 @@ npm install @shadow-js/virtual @shadow-js/core @shadow-js/web
 
 | Package | Range | Required |
 | --- | --- | --- |
-| `@shadow-js/core` | `^1.0.0` | yes |
-| `@shadow-js/web` | `^1.0.0` | yes |
+| `@shadow-js/core` | `^1.0.1` | yes |
+| `@shadow-js/web` | `^1.0.1` | yes |
 
 ## Import paths
 
