@@ -67,7 +67,8 @@ describe("keyed row reuse", () => {
     flushSync();
     expect(inner.querySelector<HTMLElement>('[data-index="5"]')).toBe(before);
 
-    // A row above it is measured taller: row 5 moves down by 60px, on the same node.
+    // A row above it is measured taller: row 5 moves down by 60px, on the same node, and the scroll
+    // offset follows by the same 60px, so the row stays where it is on screen.
     const above = document.createElement("div");
     above.setAttribute("data-index", "1");
     above.getBoundingClientRect = () => ({ height: 90, width: 0 }) as DOMRect;
@@ -78,6 +79,7 @@ describe("keyed row reuse", () => {
     expect(after).toBe(before);
     // Rows 0 to 4 start at 0, 30, 120, 150 and 180 once row 1 is 90px: row 5 starts at 210.
     expect(after?.style.transform).toBe("translateY(210px)");
+    expect(list?.offset()).toBe(120);
     detach();
   });
 });

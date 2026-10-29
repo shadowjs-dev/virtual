@@ -99,7 +99,10 @@ Package-specific rules:
 - A row's `ref` runs before the row is inserted: `measureElement` defers a disconnected element to
   the next microtask (`VIR-34`).
 - A scroll-to request is re-applied after measurements above it, and dropped once the user scrolls
-  (`VIR-35`). Keep that rule when changing the scroll code.
+  (`VIR-35`). A smooth request survives the positions the browser reports on its way and ends on arrival, after one
+  more alignment if the layout moved (`VIR-R7-2`). Keep that rule when changing the scroll code.
+- A row measured above the scroll offset moves the offset by its change of size, so the rows in view stay where
+  they are (`VIR-85`, `VIR-R7-1`); `adjustScrollOnMeasure: false` turns it off.
 - Listeners and observers are removed by the function `attach()` returns (`VIR-30`).
 - The layout is cached only for a fixed `estimateSize` without `getItemKey`, keyed by the row count and the
   measurement version. A function estimate may read signals, so it is called on every layout (`VIR-75`).

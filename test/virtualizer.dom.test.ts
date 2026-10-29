@@ -155,11 +155,16 @@ describe("createVirtualizer", () => {
     // The user scrolls somewhere else: the request is no longer followed.
     element.scrollTop = 120;
     element.dispatchEvent(new Event("scroll"));
-    tall.getBoundingClientRect = () => ({ height: 70, width: 0 }) as DOMRect;
-    virtualizer.measureElement(tall);
+    // A row below the new position changes the layout: the request is not followed, and nothing above moves.
+    const later = document.createElement("div");
+    later.setAttribute("data-index", "30");
+    later.getBoundingClientRect = () => ({ height: 70, width: 0 }) as DOMRect;
+    document.body.append(later);
+    virtualizer.measureElement(later);
     expect(virtualizer.offset()).toBe(120);
     detach();
     tall.remove();
+    later.remove();
   });
 
   it("[VIR-26] a reactive count changes the total and the items", () => {

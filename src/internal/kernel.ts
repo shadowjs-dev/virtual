@@ -29,10 +29,11 @@ export interface Kernel {
   offset(): number;
   /** The viewport size along the list's axis (tracked). */
   viewport(): number;
-  /** Sets the offset signal. The element is not written: a feature does that. */
-  setOffset(next: number): void;
-  /** The scrolled element once attached (a window included), otherwise `null`. */
-  element(): HTMLElement | Window | null;
+  /**
+   * Sets the offset signal and scrolls the attached element (a window included) to the offset along the list's axis:
+   * the page margin and the right-to-left sign are applied. Before `attach` only the signal is set.
+   */
+  scrollTo(next: number, behavior: ScrollBehavior): void;
   /**
    * Builds the rows to list for a range (a feature may add rows, such as pinned sticky rows). `make`
    * builds the plain item of one row. Without this hook the core lists the rows in view.
@@ -63,6 +64,10 @@ export function registerKernel(virtualizer: object, kernel: Kernel): void {
 export function kernelOf(virtualizer: object): Kernel {
   const kernel = kernels.get(virtualizer);
   if (kernel === undefined)
-    throw new TypeError("[shadow-js/virtual] not a virtualizer created by createVirtualizer");
+    throw new TypeError(
+      __DEV__
+        ? "[shadow-js/virtual] not a virtualizer created by createVirtualizer"
+        : "VIRTUAL_KERNEL",
+    );
   return kernel;
 }

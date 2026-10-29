@@ -64,7 +64,8 @@ export interface ScrollableVirtualizer extends Virtualizer {
    * Scrolls so that the item at `index` is in view with the alignment (the row that holds it, with
    * `lanes`). An index past either end of the list scrolls to the nearest row, and an empty list
    * ignores the request. The request is applied again each time a measurement changes the layout,
-   * until the user scrolls somewhere else.
+   * until the user scrolls somewhere else. A `"smooth"` request ignores the positions the scroll
+   * reports on its way, and ends when it arrives, after one more alignment if the layout moved.
    * @param index The item index.
    * @param options The alignment and the scroll behavior.
    */
@@ -127,29 +128,13 @@ export function withScrollTo(virtualizer: Virtualizer): ScrollableVirtualizer {
   /**
    * The last scroll-to-row request. Measuring the rows above it can move it (estimates are replaced
    * by real sizes), so it is re-applied after each measurement until the user scrolls on their own.
+   * `applied` is the offset asked of the element, `last` the last position the element reported.
    */
-  let pending: { row: number; options: ScrollToOptions; applied: number } | undefined;
+  let pending: { row: number; options: ScrollToOptions; applied: number; last: number } | undefined;
 
-  /** Moves the offset signal and, when there is an element, the element itself. */
-  const applyOffset = (next: number, behavior: "auto" | "smooth"): void => {
-    kernel.setOffset(next);
-    const element = kernel.element();
-    if (element === null) return;
-    // The page's scroll position counts from the page start: the margin is added for a window only.
-    const isWindow = (element as Partial<Window>).window === element;
-    const margin = isWindow ? kernel.scrollMargin : 0;
-    if (kernel.horizontal) {
-      // Right to left, the page reports its position as a negative: the margin is part of that distance.
-      element.scrollTo({ left: kernel.rtl ? -(next + margin) : next + margin, behavior });
-    } else {
-      element.scrollTo({ top: next + margin, behavior });
-    }
-  };
-
-  const scrollToRow = (row: number, options: ScrollToOptions): number => {
-    const layout = untrack(kernel.layout);
-    const next = alignedOffset(
-      layout,
+  const targetOf = (row: number, options: ScrollToOptions): number =>
+    alignedOffset(
+      untrack(kernel.layout),
       row,
       untrack(kernel.viewport),
       untrack(kernel.offset),
@@ -157,18 +142,31 @@ export function withScrollTo(virtualizer: Virtualizer): ScrollableVirtualizer {
       kernel.scrollPaddingStart,
       kernel.scrollPaddingEnd,
     );
-    applyOffset(next, options.behavior ?? "auto");
-    return next;
+
+  /** Scrolls to the row of a request (every read is untracked) and notes the offset it asked for. */
+  const align = (request: NonNullable<typeof pending>): void => {
+    request.applied = targetOf(request.row, request.options);
+    kernel.scrollTo(request.applied, request.options.behavior ?? "auto");
   };
 
   kernel.measured = () => {
-    if (pending === undefined) return;
-    const request = pending;
-    pending = { ...request, applied: untrack(() => scrollToRow(request.row, request.options)) };
+    if (pending !== undefined) align(pending);
   };
   kernel.scrolled = (moved) => {
-    // A scroll that is not the one a request applied is the user's: stop re-aligning.
-    if (pending !== undefined && Math.abs(moved - pending.applied) > 1) pending = undefined;
+    const request = pending;
+    if (request === undefined) return;
+    const { applied, last, options } = request;
+    request.last = moved;
+    if (Math.abs(moved - applied) <= 1) {
+      // A smooth scroll has arrived: it ends the request, after one more alignment if the layout moved meanwhile.
+      if (options.behavior !== "smooth") return;
+      if (Math.abs(targetOf(request.row, options) - moved) > 1) align(request);
+      else pending = undefined;
+    } else if (!(options.behavior === "smooth" && (moved - last) * (moved - applied) <= 0)) {
+      // A scroll that is not the one a request applied is the user's: stop re-aligning. A smooth scroll reports the
+      // positions on its way, between where it was and where it goes: those are not the user's.
+      pending = undefined;
+    }
   };
 
   return Object.assign(virtualizer, {
@@ -180,8 +178,8 @@ export function withScrollTo(virtualizer: Virtualizer): ScrollableVirtualizer {
         // Infinity is the end of the list (and -Infinity its start); only a NaN has no place, and goes to the start.
         const wanted = Math.floor((Number.isNaN(index) ? 0 : index) / kernel.lanes);
         const row = Math.min(Math.max(0, wanted), rows - 1);
-        const applied = scrollToRow(row, options);
-        pending = { row, options, applied };
+        pending = { row, options, applied: 0, last: kernel.offset() };
+        align(pending);
       });
     },
     scrollToOffset(next: number, options: ScrollToOptions = {}): void {
@@ -193,7 +191,7 @@ export function withScrollTo(virtualizer: Virtualizer): ScrollableVirtualizer {
           Math.max(0, wanted),
           Math.max(0, layout.total - kernel.viewport()),
         );
-        applyOffset(clamped, options.behavior ?? "auto");
+        kernel.scrollTo(clamped, options.behavior ?? "auto");
       });
     },
   });

@@ -53,6 +53,14 @@ on mount and detaches on dispose; render `list.items()` inside the element sized
 
 - Reference: `/reference/virtual/` on the documentation site.
 
+## Production error codes
+
+A production build keeps a short code instead of the development explanation, so message text never reaches user bundles. Search this table for the code.
+
+| Code | Development explanation |
+| --- | --- |
+| `VIRTUAL_KERNEL` | not a virtualizer created by createVirtualizer. |
+
 ## Dependencies
 
 - Runtime: none.

@@ -148,6 +148,15 @@ export interface VirtualizerOptions {
    * is not above `0` is ignored.
    */
   readonly measureSize?: (element: Element, horizontal: boolean) => number;
+  /**
+   * Keeps the rows in view where they are when a row above the viewport is measured: the scroll
+   * position moves by the change of that row's size. Without it, measuring a row that starts before
+   * the scroll offset shifts every row in view, and a list of rows of unknown height jumps while the
+   * user scrolls up through rows not measured yet. Only a list attached to a scroll element has a
+   * position to move.
+   * @default true
+   */
+  readonly adjustScrollOnMeasure?: boolean;
 }
 
 /**
@@ -245,7 +254,8 @@ export interface Virtualizer {
    * needs a `data-index` attribute with the row index; an element without one, with an index that
    * is not a non-negative integer, or with a size that is not above `0` is ignored. An element that is
    * not in the document yet is measured on the next microtask, once it is connected. After
-   * `attach`, the element is observed and measured again when it resizes.
+   * `attach`, the element is observed and measured again when it resizes. A row that starts above
+   * the scroll offset moves the offset by its change of size (see `adjustScrollOnMeasure`).
    * @param element The row's element; `null` is ignored.
    */
   measureElement(element: Element | null): void;
@@ -417,13 +427,25 @@ export function createVirtualizer(options: VirtualizerOptions): Virtualizer {
   /** The element the list is attached to; read by the offset writes of a scroll-to feature. */
   let attached: HTMLElement | Window | null = null;
 
+  const scrollTo = (next: number, behavior: ScrollBehavior): void => {
+    setOffset(next);
+    if (attached === null) return;
+    // The page's position counts from the page start; right to left, a horizontal position is negative.
+    const at = next + (isWindow(attached) ? scrollMargin : 0);
+    attached.scrollTo(horizontal ? { left: rtl ? -at : at, behavior } : { top: at, behavior });
+  };
+
   const readOffset = (element: HTMLElement | Window): number => {
-    if (isWindow(element)) {
-      const raw = horizontal ? element.scrollX : element.scrollY;
-      return Math.max(0, Math.abs(raw) - scrollMargin);
-    }
-    const raw = horizontal ? element.scrollLeft : element.scrollTop;
-    return Math.abs(raw);
+    const page = isWindow(element);
+    const raw = horizontal
+      ? page
+        ? element.scrollX
+        : element.scrollLeft
+      : page
+        ? element.scrollY
+        : element.scrollTop;
+    // The page's position counts from the page start: its margin comes off.
+    return Math.max(0, Math.abs(raw) - (page ? scrollMargin : 0));
   };
   const readViewport = (element: HTMLElement | Window): number => {
     if (isWindow(element)) return horizontal ? element.innerWidth : element.innerHeight;
@@ -487,8 +509,15 @@ export function createVirtualizer(options: VirtualizerOptions): Virtualizer {
       if (!(size > 0)) return;
       const key = keyOfRow(row);
       if (measured.get(key) !== size) {
+        // A row that starts above the offset pushes the rows in view by its change of size: the scroll follows it.
+        const before = untrack(layoutNow);
+        const grew = size - (before.sizes[row] ?? size);
+        const above = (before.starts[row] ?? Number.POSITIVE_INFINITY) < untrack(offset);
         measured.set(key, size);
         measuredBump();
+        // The scroll follows it, at once.
+        if (above && grew !== 0 && attached !== null && options.adjustScrollOnMeasure !== false)
+          scrollTo(untrack(offset) + grew, "instant");
         kernel.measured?.();
       }
     },
@@ -561,8 +590,7 @@ export function createVirtualizer(options: VirtualizerOptions): Virtualizer {
     rowCount,
     offset,
     viewport,
-    setOffset,
-    element: () => attached,
+    scrollTo,
   };
   registerKernel(virtualizer, kernel);
   return virtualizer;

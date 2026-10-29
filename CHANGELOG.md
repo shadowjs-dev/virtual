@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.3
+
+### Fixed
+
+- Smaller bundles with the same behavior. Production builds of table, query and virtual throw short codes (`TABLE_DUPLICATE`, `QUERY_LIMIT`, `VIRTUAL_KERNEL`) instead of the development messages; each package's README lists them.
+- virtual: measuring a row that starts above the scroll offset moves the offset by the size change, so dynamic-height lists no longer jump when scrolling up; `adjustScrollOnMeasure: false` turns it off
+- virtual: a smooth `scrollToIndex` keeps its re-alignment while the scroll is on its way and re-aligns once on arrival
+
 ## 1.0.2
 
 ### Fixed
