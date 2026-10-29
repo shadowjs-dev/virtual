@@ -39,7 +39,7 @@ describe("invalid options", () => {
     expect(broken.items().map((item) => item.indexes)).toEqual([[0], [1], [2], [3], [4]]);
   });
 
-  it("[VIR-42] a NaN or negative size estimate is laid out as zero, never as NaN", () => {
+  it("[VIR-42] a NaN or negative size estimate is laid out as the 1px minimum, never as NaN", () => {
     const layout = computeLayout({
       count: 3,
       estimate: (index) => (index === 1 ? Number.NaN : -5),
@@ -49,14 +49,14 @@ describe("invalid options", () => {
       paddingStart: 0,
       paddingEnd: 0,
     });
-    expect(layout.sizes).toEqual([0, 0, 0]);
-    expect(layout.total).toBe(0);
+    expect(layout.sizes).toEqual([1, 1, 1]);
+    expect(layout.total).toBe(3);
     const list = scrollable({
       count: 3,
       estimateSize: () => Number.NaN,
       initialRect: rect,
     });
-    expect(list.totalSize()).toBe(0);
+    expect(list.totalSize()).toBe(3);
     expect(Number.isNaN(list.items()[0]?.start)).toBe(false);
   });
 });

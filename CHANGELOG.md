@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.2
+
+### Fixed
+
+- `scrollToIndex(Infinity)` scrolls to the last row (and `-Infinity` to the first) instead of the top.
+- A right-to-left horizontal list on the window with a `scrollMargin` scrolls to the negative of the offset plus the margin, matching how the position is read back.
+- A size estimate that is `0`, negative, `NaN` or infinite lays a row out as 1px (a measured size is unchanged), so `estimateSize: 0` no longer renders only the last rows of a long list.
+
 ## 1.0.1
 
 ### Changed

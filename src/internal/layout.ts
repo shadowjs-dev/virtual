@@ -107,9 +107,23 @@ export interface Layout {
 }
 
 /**
+ * The size a row is laid out with when its estimate is not a positive finite number.
+ * @example
+ * MIN_ESTIMATE; // 1
+ * @since 1.0.0
+ */
+export const MIN_ESTIMATE = 1;
+
+const usableEstimate = (raw: number): number =>
+  raw > 0 && Number.isFinite(raw) ? raw : MIN_ESTIMATE;
+
+/**
  * Computes the starts, sizes and total length of a list from estimated and measured row sizes.
  * Pure arithmetic in O(count), with no DOM; the virtualizer runs it on every layout change, and it
  * is exported for tests and custom renderers.
+ *
+ * A row's size is its measured size, or its estimate; an estimate that is not a positive finite number (`0`, negative, `NaN`,
+ * `Infinity`) counts as `1`, so a list with a bad estimate still has distinct row offsets and a sane range.
  *
  * @param input The row count, the sizes and the spacing.
  * @returns The layout. Row `i` starts at `paddingStart` plus the sizes and gaps of the rows before
@@ -141,9 +155,12 @@ export function computeLayout(input: LayoutInput): Layout {
   const rows = input.count > 0 ? Math.floor(input.count) : 0;
   let cursor = input.paddingStart;
   for (let index = 0; index < rows; index += 1) {
-    const raw = input.measured.get(input.keyOf(index)) ?? input.estimate(index);
-    // A size that is not above zero (NaN, negative) lays out as zero.
-    const size = raw > 0 ? raw : 0;
+    const known = input.measured.get(input.keyOf(index));
+    // A measured size is what the browser reported, and a hidden row really is 0 (a NaN or negative one lays out as 0). An
+    // estimate that is not a positive number (0, negative, NaN, Infinity) would put every row at one offset, so the whole list
+    // would count as "in view" and only its last rows would render: it lays out as the smallest size instead.
+    const size =
+      known !== undefined ? (known > 0 ? known : 0) : usableEstimate(input.estimate(index));
     starts.push(cursor);
     sizes.push(size);
     cursor += size + input.gap;

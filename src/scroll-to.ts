@@ -139,7 +139,8 @@ export function withScrollTo(virtualizer: Virtualizer): ScrollableVirtualizer {
     const isWindow = (element as Partial<Window>).window === element;
     const margin = isWindow ? kernel.scrollMargin : 0;
     if (kernel.horizontal) {
-      element.scrollTo({ left: (kernel.rtl ? -next : next) + margin, behavior });
+      // Right to left, the page reports its position as a negative: the margin is part of that distance.
+      element.scrollTo({ left: kernel.rtl ? -(next + margin) : next + margin, behavior });
     } else {
       element.scrollTo({ top: next + margin, behavior });
     }
@@ -176,7 +177,8 @@ export function withScrollTo(virtualizer: Virtualizer): ScrollableVirtualizer {
         const rows = kernel.rowCount();
         if (rows === 0) return;
         // An index past either end scrolls to the nearest row: a request is never silently a scroll to the top.
-        const wanted = Math.floor((Number.isFinite(index) ? index : 0) / kernel.lanes);
+        // Infinity is the end of the list (and -Infinity its start); only a NaN has no place, and goes to the start.
+        const wanted = Math.floor((Number.isNaN(index) ? 0 : index) / kernel.lanes);
         const row = Math.min(Math.max(0, wanted), rows - 1);
         const applied = scrollToRow(row, options);
         pending = { row, options, applied };

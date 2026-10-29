@@ -63,6 +63,8 @@ export interface VirtualizerOptions {
   readonly getScrollElement?: () => HTMLElement | Window | null;
   /**
    * The size of a row before it is measured: a number for every row, or a function of the row index.
+   * An estimate that is not a positive finite number (`0`, negative, `NaN`, `Infinity`) counts as `1`, so a bad estimate cannot
+   * stack every row at one offset (which would render only the last rows).
    * @default 50
    */
   readonly estimateSize?: SizeEstimate;
