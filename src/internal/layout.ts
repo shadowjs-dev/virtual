@@ -149,25 +149,49 @@ const usableEstimate = (raw: number): number =>
  * @since 1.0.0
  */
 export function computeLayout(input: LayoutInput): Layout {
+  // The callbacks run as methods of `input`, as they always have, so a `function` that reads `this` keeps working.
+  return layoutOf(
+    input.count,
+    (index) => input.estimate(index),
+    input.measured,
+    (index) => input.keyOf(index),
+    input.gap,
+    input.paddingStart,
+    input.paddingEnd,
+  );
+}
+
+/**
+ * {@link computeLayout} with positional arguments, for the virtualizer: an object literal repeats its property names in
+ * every bundle that builds a virtualizer.
+ * @internal
+ */
+export function layoutOf(
+  count: number,
+  estimate: (index: number) => number,
+  measured: ReadonlyMap<unknown, number>,
+  keyOf: (index: number) => unknown,
+  gap: number,
+  paddingStart: number,
+  paddingEnd: number,
+): Layout {
   const starts: number[] = [];
   const sizes: number[] = [];
   // A count that is not a positive number (NaN, negative) is an empty list: a NaN must not reach the arithmetic.
-  const rows = input.count > 0 ? Math.floor(input.count) : 0;
-  let cursor = input.paddingStart;
+  const rows = count > 0 ? Math.floor(count) : 0;
+  let cursor = paddingStart;
   for (let index = 0; index < rows; index += 1) {
-    const known = input.measured.get(input.keyOf(index));
+    const known = measured.get(keyOf(index));
     // A measured size is what the browser reported, and a hidden row really is 0 (a NaN or negative one lays out as 0). An
     // estimate that is not a positive number (0, negative, NaN, Infinity) would put every row at one offset, so the whole list
     // would count as "in view" and only its last rows would render: it lays out as the smallest size instead.
-    const size =
-      known !== undefined ? (known > 0 ? known : 0) : usableEstimate(input.estimate(index));
+    const size = known !== undefined ? (known > 0 ? known : 0) : usableEstimate(estimate(index));
     starts.push(cursor);
     sizes.push(size);
-    cursor += size + input.gap;
+    cursor += size + gap;
   }
   // The gap after the last row is not there: the end padding follows the last size directly.
-  const total =
-    rows === 0 ? input.paddingStart + input.paddingEnd : cursor - input.gap + input.paddingEnd;
+  const total = rows === 0 ? paddingStart + paddingEnd : cursor - gap + paddingEnd;
   return { starts, sizes, total };
 }
 

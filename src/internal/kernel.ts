@@ -11,16 +11,10 @@ import type { Layout } from "./layout";
 export interface Kernel {
   /** Items per row (`lanes`, at least 1). */
   readonly lanes: number;
-  /** True for a horizontal list. */
-  readonly horizontal: boolean;
-  /** True for a right-to-left horizontal list. */
-  readonly rtl: boolean;
-  /** Distance from the page start to the list (window scroller). */
-  readonly scrollMargin: number;
-  /** Space kept clear at the start of the viewport. */
-  readonly scrollPaddingStart: number;
-  /** Space kept clear at the end of the viewport. */
-  readonly scrollPaddingEnd: number;
+  /** Space kept clear at the start of the viewport (`scrollPaddingStart`). */
+  readonly padStart: number;
+  /** Space kept clear at the end of the viewport (`scrollPaddingEnd`). */
+  readonly padEnd: number;
   /** The layout of the rows. Reads the count and the measured sizes (tracked). */
   layout(): Layout;
   /** The number of rows (tracked). */

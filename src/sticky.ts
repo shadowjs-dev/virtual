@@ -53,7 +53,7 @@ export function withSticky(virtualizer: Virtualizer, indexes: readonly number[])
     return rows.map((row) => {
       const item = make(row);
       if (!sticky.includes(row)) return item;
-      const start = stickyStart(layout, row, sticky, currentOffset, kernel.scrollPaddingStart);
+      const start = stickyStart(layout, row, sticky, currentOffset, kernel.padStart);
       return {
         ...item,
         start,

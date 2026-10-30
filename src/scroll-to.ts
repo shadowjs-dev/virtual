@@ -139,8 +139,8 @@ export function withScrollTo(virtualizer: Virtualizer): ScrollableVirtualizer {
       untrack(kernel.viewport),
       untrack(kernel.offset),
       options.align ?? "auto",
-      kernel.scrollPaddingStart,
-      kernel.scrollPaddingEnd,
+      kernel.padStart,
+      kernel.padEnd,
     );
 
   /** Scrolls to the row of a request (every read is untracked) and notes the offset it asked for. */

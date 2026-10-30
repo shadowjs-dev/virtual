@@ -64,7 +64,7 @@ A production build keeps a short code instead of the development explanation, so
 ## Dependencies
 
 - Runtime: none.
-- Peers: `@shadow-js/core` and `@shadow-js/web` `^1.0.0`: reactive state and rendering for the virtualizers.
+- Peers: `@shadow-js/core` and `@shadow-js/web` `^1.0.3`: reactive state and rendering for the virtualizers.
 
 ## Types
 

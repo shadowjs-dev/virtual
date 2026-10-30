@@ -6,7 +6,7 @@
  */
 import { type Accessor, onMount, untrack, useSignal } from "@shadow-js/core";
 import { type Kernel, registerKernel } from "./internal/kernel";
-import { computeLayout, finite, type Layout, visibleRange } from "./internal/layout";
+import { finite, type Layout, layoutOf, visibleRange } from "./internal/layout";
 
 /**
  * The size of a row before it is measured, in pixels along the list's axis: one number for every
@@ -312,17 +312,12 @@ export function createVirtualizer(options: VirtualizerOptions): Virtualizer {
   const scrollPaddingStart = finite(options.scrollPaddingStart, 0);
   const scrollPaddingEnd = finite(options.scrollPaddingEnd, 0);
   const scrollMargin = finite(options.scrollMargin, 0);
-  const estimate =
-    typeof options.estimateSize === "function"
-      ? options.estimateSize
-      : (() => {
-          const fixed = options.estimateSize ?? 50;
-          return () => fixed;
-        })();
+  const sized = options.estimateSize ?? 50;
+  const estimate = typeof sized === "function" ? sized : () => sized;
   // A fixed estimate with no key function makes the layout a pure function of the row count and the
   // measured sizes, so it can be kept until one of those changes. A function estimate is called on
   // every layout, because it may read signals the caller expects to be tracked.
-  const cacheable = typeof options.estimateSize !== "function" && options.getItemKey === undefined;
+  const cacheable = typeof sized !== "function" && options.getItemKey === undefined;
   const measureSize =
     options.measureSize ??
     ((element: Element, axis: boolean): number => {
@@ -364,28 +359,20 @@ export function createVirtualizer(options: VirtualizerOptions): Virtualizer {
     const live = new Set<unknown>();
     for (let row = 0; row < rows; row += 1) live.add(keyOfRow(row));
     // Deleting the entry being visited is allowed by Map; no copy of the keys is made.
-    measured.forEach((_size, key) => {
+    for (const key of measured.keys()) {
       if (!live.has(key)) measured.delete(key);
-    });
+    }
   };
 
   /** Starts, sizes and total of the rows. Reads the count and the measured sizes (tracked). */
   const layoutNow = (): Layout => {
     const current = version();
-    const rows = rowsOf(countOf());
+    const rows = rowCount();
     if (cacheable && cached !== undefined && cached.rows === rows && cached.version === current) {
       return cached.layout;
     }
     forgetAbsent(rows);
-    const layout = computeLayout({
-      count: rows,
-      estimate,
-      measured,
-      keyOf: keyOfRow,
-      gap,
-      paddingStart,
-      paddingEnd,
-    });
+    const layout = layoutOf(rows, estimate, measured, keyOfRow, gap, paddingStart, paddingEnd);
     cached = cacheable ? { rows, version: current, layout } : undefined;
     return layout;
   };
@@ -432,7 +419,8 @@ export function createVirtualizer(options: VirtualizerOptions): Virtualizer {
     if (attached === null) return;
     // The page's position counts from the page start; right to left, a horizontal position is negative.
     const at = next + (isWindow(attached) ? scrollMargin : 0);
-    attached.scrollTo(horizontal ? { left: rtl ? -at : at, behavior } : { top: at, behavior });
+    // `rtl` implies `horizontal`.
+    attached.scrollTo({ [horizontal ? "left" : "top"]: rtl ? -at : at, behavior });
   };
 
   const readOffset = (element: HTMLElement | Window): number => {
@@ -509,14 +497,16 @@ export function createVirtualizer(options: VirtualizerOptions): Virtualizer {
       if (!(size > 0)) return;
       const key = keyOfRow(row);
       if (measured.get(key) !== size) {
-        // A row that starts above the offset pushes the rows in view by its change of size: the scroll follows it.
+        // A row that starts above the offset pushes the rows in view by its change of size: the scroll
+        // follows it, at once. A row past the end of the list has no start, so nothing moves.
         const before = untrack(layoutNow);
-        const grew = size - (before.sizes[row] ?? size);
-        const above = (before.starts[row] ?? Number.POSITIVE_INFINITY) < untrack(offset);
+        const grew =
+          (before.starts[row] as number) < untrack(offset)
+            ? size - (before.sizes[row] as number)
+            : 0;
         measured.set(key, size);
         measuredBump();
-        // The scroll follows it, at once.
-        if (above && grew !== 0 && attached !== null && options.adjustScrollOnMeasure !== false)
+        if (grew !== 0 && attached !== null && options.adjustScrollOnMeasure !== false)
           scrollTo(untrack(offset) + grew, "instant");
         kernel.measured?.();
       }
@@ -536,9 +526,9 @@ export function createVirtualizer(options: VirtualizerOptions): Virtualizer {
         pruneObserved();
         setOffset(moved);
         setScrolling(true);
-        if (idle !== undefined) clearTimeout(idle);
+        // Clearing a timer that has run, or none, does nothing.
+        clearTimeout(idle);
         idle = setTimeout(() => {
-          idle = undefined;
           setScrolling(false);
         }, IDLE_MS);
       };
@@ -566,7 +556,7 @@ export function createVirtualizer(options: VirtualizerOptions): Virtualizer {
         stopAttached = undefined;
         element.removeEventListener("scroll", onScroll);
         if (windowScroller) element.removeEventListener("resize", onResize);
-        if (idle !== undefined) clearTimeout(idle);
+        clearTimeout(idle);
         ownObserver?.disconnect();
         if (observer === ownObserver) observer = undefined;
         observed.clear();
@@ -581,11 +571,8 @@ export function createVirtualizer(options: VirtualizerOptions): Virtualizer {
   // The feature entries reach the list through the kernel; they set the hooks.
   const kernel: Kernel = {
     lanes,
-    horizontal,
-    rtl,
-    scrollMargin,
-    scrollPaddingStart,
-    scrollPaddingEnd,
+    padStart: scrollPaddingStart,
+    padEnd: scrollPaddingEnd,
     layout: layoutNow,
     rowCount,
     offset,
