@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.5
+
+### Fixed
+
+- A virtualizer that is attached again observes the rows still in the document.
+- A sticky index past the loaded end of the list, negative or fractional, no longer hides or invents a pinned header.
+
 ## 1.0.4
 
 ### Fixed

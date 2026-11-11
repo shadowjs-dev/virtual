@@ -342,8 +342,9 @@ export function stickyStart(
   const natural = layout.starts[index] ?? 0;
   const size = layout.sizes[index] ?? 0;
   const pinned = Math.max(offset + paddingStart, natural);
+  // A sticky row the list does not have (yet: an infinite list that has loaded less than its headers) pushes nothing.
   const next = stickyIndexes.find((candidate) => candidate > index);
-  if (next === undefined) return pinned;
+  if (next === undefined || next >= layout.starts.length) return pinned;
   const nextStart = layout.starts[next] ?? 0;
   const nextPinned = Math.max(offset + paddingStart, nextStart);
   return Math.min(pinned, nextPinned - size);

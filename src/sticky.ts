@@ -16,7 +16,8 @@ import type { Virtualizer } from "./virtualizer";
  * has scrolled out of the range in view, with `isSticky` and `isActiveSticky` set.
  *
  * @param virtualizer A virtualizer created by this package.
- * @param indexes The sticky row indexes, in any order (a sorted copy is kept).
+ * @param indexes The sticky row indexes, in any order (a sorted copy is kept). An index that is not a whole number
+ *   from 0 is ignored, and so is one past the end of the list while the list is shorter.
  * @returns The same virtualizer.
  * @throws TypeError when the object was not created by this package.
  * @example
@@ -34,7 +35,9 @@ import type { Virtualizer } from "./virtualizer";
  */
 export function withSticky(virtualizer: Virtualizer, indexes: readonly number[]): Virtualizer {
   const kernel = kernelOf(virtualizer);
-  const sticky = [...indexes].sort((a, b) => a - b);
+  // Only whole, non-negative indexes are rows: a negative or fractional one would be listed as an item that is not in
+  // the list, and a NaN would make the sort order undefined.
+  const sticky = indexes.filter((row) => Number.isInteger(row) && row >= 0).sort((a, b) => a - b);
   kernel.items = (range, layout, make) => {
     // The sticky row that is pinned at the top is drawn even when it has scrolled out of range.
     let pinned: number | undefined;

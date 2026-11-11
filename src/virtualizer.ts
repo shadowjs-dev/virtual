@@ -559,7 +559,9 @@ export function createVirtualizer(options: VirtualizerOptions): Virtualizer {
         clearTimeout(idle);
         ownObserver?.disconnect();
         if (observer === ownObserver) observer = undefined;
-        observed.clear();
+        // The rows that are still in the document stay known, so a later `attach` observes them again; the ones
+        // that have left it are forgotten, so a detached list holds no removed row.
+        for (const node of [...observed]) if (!node.isConnected) observed.delete(node);
         if (attached === element) attached = null;
       };
       stopAttached = stop;
