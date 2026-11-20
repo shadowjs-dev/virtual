@@ -61,4 +61,27 @@ describe("virtualizer performance budgets", () => {
     expect(median).toBeLessThan(LAYOUT_PASS_BUDGET_MS);
     expect(list.totalSize()).toBeGreaterThan(30 * ROWS);
   });
+
+  it("[VIR-G14] fifty rows measured in one pass of a million-row list cost about one layout pass, not fifty", () => {
+    const list = scrollable({
+      count: ROWS,
+      estimateSize: 30,
+      overscan: 4,
+      initialRect: { width: 0, height: 900 },
+      measureSize: (element, horizontal) =>
+        horizontal ? 1 : 40 + (Number(element.getAttribute("data-index")) % 7),
+    });
+    list.items();
+    const rowElement = (index: number) =>
+      ({ isConnected: true, getAttribute: () => String(index) }) as unknown as Element;
+    let pass = 0;
+    const median = medianMs(5, () => {
+      // Each sample measures fifty rows not measured before, as a list that shows a new screen does.
+      for (let row = 0; row < 50; row += 1) list.measureElement(rowElement(pass * 50 + row));
+      pass += 1;
+      list.items();
+    });
+    // Fifty full passes would take fifty times the budget of one; patching the cached layout shifts numbers only.
+    expect(median).toBeLessThan(LAYOUT_PASS_BUDGET_MS * 2);
+  });
 });

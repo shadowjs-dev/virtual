@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.0
+
+### Fixed
+
+- Rows measured one after another in the same pass no longer recompute the whole layout once each. With a fixed `estimateSize` and no `getItemKey`, the new sizes wait and are applied in one sweep at the next read (at most 256 wait; past that a measurement applies them). Fifty rows measured in a million-row list now cost about one layout pass instead of fifty.
+
 ## 1.1.2
 
 ### Changed

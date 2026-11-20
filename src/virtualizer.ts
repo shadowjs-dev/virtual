@@ -347,7 +347,7 @@ export function createVirtualizer(options: VirtualizerOptions): Virtualizer {
     setVersion(untrack(version) + 1);
   };
 
-  let cached: { rows: number; version: number; layout: Layout } | undefined;
+  let cached: { readonly rows: number; version: number; layout: Layout } | undefined;
 
   /**
    * Drops the measured sizes of keys that are no longer in the list, once there are more of them
@@ -364,13 +364,42 @@ export function createVirtualizer(options: VirtualizerOptions): Virtualizer {
     }
   };
 
+  /**
+   * Rows measured since the cached layout was computed, with their new size. A list whose rows are
+   * measured as they appear makes many measurements in one pass; recomputing the whole layout for each
+   * (an estimate and a key per row) cost one full pass per row. The sizes wait here and are applied in
+   * one sweep when the layout is next read. Bounded: past this many, the next measurement applies them.
+   */
+  const pending = new Map<number, number>();
+
+  /** `base` with the pending sizes applied: one pass from the first changed row (at most 256 wait). */
+  const applyPending = (base: Layout): Layout => {
+    const starts = base.starts.slice();
+    const sizes = base.sizes.slice();
+    let shift = 0;
+    for (let index = Math.min(...pending.keys()); index < starts.length; index += 1) {
+      starts[index] = (starts[index] as number) + shift;
+      const size = pending.get(index);
+      if (size !== undefined) {
+        shift += size - (sizes[index] as number);
+        sizes[index] = size;
+      }
+    }
+    pending.clear();
+    return { starts, sizes, total: base.total + shift };
+  };
+
   /** Starts, sizes and total of the rows. Reads the count and the measured sizes (tracked). */
   const layoutNow = (): Layout => {
     const current = version();
     const rows = rowCount();
     if (cacheable && cached !== undefined && cached.rows === rows && cached.version === current) {
+      if (pending.size > 0)
+        cached = { rows, version: current, layout: applyPending(cached.layout) };
       return cached.layout;
     }
+    // A full computation reads every measured size, the pending ones included.
+    pending.clear();
     forgetAbsent(rows);
     const layout = layoutOf(rows, estimate, measured, keyOfRow, gap, paddingStart, paddingEnd);
     cached = cacheable ? { rows, version: current, layout } : undefined;
@@ -499,13 +528,29 @@ export function createVirtualizer(options: VirtualizerOptions): Virtualizer {
       if (measured.get(key) !== size) {
         // A row that starts above the offset pushes the rows in view by its change of size: the scroll
         // follows it, at once. A row past the end of the list has no start, so nothing moves.
-        const before = untrack(layoutNow);
-        const grew =
-          (before.starts[row] as number) < untrack(offset)
-            ? size - (before.sizes[row] as number)
-            : 0;
+        // The cached layout, when it is current, with the sizes measured since (O(pending), not O(rows));
+        // past 256 waiting sizes, or with no current cache, a read applies or computes them.
+        const base =
+          cacheable &&
+          pending.size < 256 &&
+          cached?.rows === untrack(rowCount) &&
+          cached.version === untrack(version)
+            ? cached.layout
+            : untrack(layoutNow);
+        let start = base.starts[row];
+        const sizeBefore = pending.get(row) ?? (base.sizes[row] as number);
+        if (start !== undefined) {
+          for (const [other, otherSize] of pending) {
+            if (other < row) start += otherSize - (base.sizes[other] as number);
+          }
+        }
+        const grew = start !== undefined && start < untrack(offset) ? size - sizeBefore : 0;
         measured.set(key, size);
         measuredBump();
+        if (cached?.layout === base && start !== undefined) {
+          pending.set(row, size);
+          cached.version = untrack(version);
+        }
         if (grew !== 0 && attached !== null && options.adjustScrollOnMeasure !== false)
           scrollTo(untrack(offset) + grew, "instant");
         kernel.measured?.();
